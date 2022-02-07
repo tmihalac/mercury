@@ -55,10 +55,9 @@ public class ServiceDomainClusterControllerTest extends AbstractControllerTest {
                             .inNamespace(sdc.getMetadata().getNamespace())
                             .withName(sdc.getMetadata().getName())
                             .delete();
-                    await().atMost(2, MINUTES)
-                            .until(() -> client.resources(ServiceDomainCluster.class)
-                                    .inNamespace(sdc.getMetadata().getNamespace())
-                                    .withName(sdc.getMetadata().getName()).get() == null);
+                    serviceDomainClusterController.reconcile(sdc, null);
+                    assertNull(client.resources(ServiceDomainCluster.class).inNamespace(sdc.getMetadata().getNamespace())
+                            .withName(sdc.getMetadata().getName()).get());
                 });
 
         client.resources(Kafka.class).inAnyNamespace().list()
@@ -68,10 +67,9 @@ public class ServiceDomainClusterControllerTest extends AbstractControllerTest {
                             .inNamespace(kafka.getMetadata().getNamespace())
                             .withName(kafka.getMetadata().getName())
                             .delete();
-                    await().atMost(2, MINUTES)
-                            .until(() -> client.resources(Kafka.class)
+                    assertNull(client.resources(Kafka.class)
                                     .inNamespace(kafka.getMetadata().getNamespace())
-                                    .withName(kafka.getMetadata().getName()).get() == null);
+                                    .withName(kafka.getMetadata().getName()).get());
                 });
     }
 
@@ -84,30 +82,32 @@ public class ServiceDomainClusterControllerTest extends AbstractControllerTest {
                 .inNamespace("test-ns")
                 .create(sdc);
 
-        CompletableFuture<Kafka> result = CompletableFuture.supplyAsync(() -> {
-            Kafka kafka = null;
-            while (kafka == null) {
-                kafka = mockServer.getClient()
+        serviceDomainClusterController.reconcile(sdc, null);
+
+//        CompletableFuture<Kafka> result = CompletableFuture.supplyAsync(() -> {
+//            Kafka kafka = null;
+//            while (kafka == null) {
+            Kafka kafka = mockServer.getClient()
                         .resources(Kafka.class)
                         .inNamespace(serviceDomainCluster.getMetadata().getNamespace())
                         .withName(serviceDomainCluster.getMetadata().getName())
                         .get();
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    fail("Interrupted thread");
-                }
-            }
-            return kafka;
-        });
-        Multi.createFrom()
-                .ticks()
-                .every(Duration.ofMillis(500)).onItem().transform(e -> mockServer.getClient()
-                        .resources(Kafka.class)
-                        .inNamespace(serviceDomainCluster.getMetadata().getNamespace())
-                        .withName(serviceDomainCluster.getMetadata().getName())
-                        .get()).filter(Objects::nonNull).collect().first();
-        Kafka kafka = result.get(1, MINUTES);
+//                try {
+//                    Thread.sleep(500);
+//                } catch (InterruptedException e) {
+//                    fail("Interrupted thread");
+//                }
+//            }
+//            return kafka;
+//        });
+//        Multi.createFrom()
+//                .ticks()
+//                .every(Duration.ofMillis(500)).onItem().transform(e -> mockServer.getClient()
+//                        .resources(Kafka.class)
+//                        .inNamespace(serviceDomainCluster.getMetadata().getNamespace())
+//                        .withName(serviceDomainCluster.getMetadata().getName())
+//                        .get()).filter(Objects::nonNull).collect().first();
+//        Kafka kafka = result.get(1, MINUTES);
         assertEquals("my-sdc", kafka.getMetadata().getName());
     }
 
@@ -120,20 +120,27 @@ public class ServiceDomainClusterControllerTest extends AbstractControllerTest {
 
         Kafka expectedKafka = getExpectedKafKa(cluster);
         client.resources(Kafka.class).inNamespace(sdcNamespace).create(expectedKafka);
-        await().atMost(2, MINUTES).until(() -> client.resources(Kafka.class).inNamespace(sdcNamespace).withName(SERVICE_DOMAIN_CLUSTER_NAME).get() != null);
+//        await().atMost(2, MINUTES).until(() -> client.resources(Kafka.class).inNamespace(sdcNamespace).withName(SERVICE_DOMAIN_CLUSTER_NAME).get() != null);
         Kafka fetchedKafka = client.resources(Kafka.class).inNamespace(sdcNamespace).withName(SERVICE_DOMAIN_CLUSTER_NAME).get();
         assertNotNull(fetchedKafka);
 
         cluster = client.resources(ServiceDomainCluster.class).inNamespace(sdcNamespace).create(cluster);
+        serviceDomainClusterController.reconcile(cluster, null);
 
         expectedKafka = getExpectedKafKa(cluster);
         client.resources(Kafka.class).inNamespace(sdcNamespace).replace(expectedKafka);
-        await().atMost(2, MINUTES).until(() -> client.resources(Kafka.class)
+        assertNotNull(client.resources(Kafka.class)
                 .inNamespace(sdcNamespace)
                 .withName(SERVICE_DOMAIN_CLUSTER_NAME)
-                .get() != null);
+                .get());
+//        await().atMost(2, MINUTES).until(() -> client.resources(Kafka.class)
+//                .inNamespace(sdcNamespace)
+//                .withName(SERVICE_DOMAIN_CLUSTER_NAME)
+//                .get() != null);
 
-        await().atMost(2, MINUTES).until(() -> isServiceDomainClusterStatusUpdatedWithKafkaBrokerUrl(SERVICE_DOMAIN_CLUSTER_NAME));
+        serviceDomainClusterController.reconcile(cluster, null);
+
+        assertTrue(isServiceDomainClusterStatusUpdatedWithKafkaBrokerUrl(SERVICE_DOMAIN_CLUSTER_NAME));
         final String kafkaBrokerUrl = client.resources(ServiceDomainCluster.class)
                 .inNamespace(sdcNamespace)
                 .withName(SERVICE_DOMAIN_CLUSTER_NAME)
@@ -142,11 +149,11 @@ public class ServiceDomainClusterControllerTest extends AbstractControllerTest {
                 .getKafkaBroker();
         assertNotNull(kafkaBrokerUrl);
 
-        await().atMost(2, MINUTES).until(() -> client.resources(ServiceDomainCluster.class)
+        assertTrue(client.resources(ServiceDomainCluster.class)
                 .inNamespace(sdcNamespace)
                 .withName(SERVICE_DOMAIN_CLUSTER_NAME)
                 .get().getStatus().isReady());
-        await().atMost(2, MINUTES).until(() -> client.resources(ServiceDomainCluster.class)
+        assertTrue(client.resources(ServiceDomainCluster.class)
                 .inNamespace(sdcNamespace)
                 .withName(SERVICE_DOMAIN_CLUSTER_NAME)
                 .get().getStatus().isSpecificConditionReady(CONDITION_KAFKA_BROKER_READY));
@@ -161,6 +168,8 @@ public class ServiceDomainClusterControllerTest extends AbstractControllerTest {
                     .inNamespace(cluster.getMetadata().getNamespace())
                     .create(cluster);
 
+            serviceDomainClusterController.reconcile(cluster, null);
+
             ServiceDomainCluster current = client.resources(ServiceDomainCluster.class)
                     .inNamespace(cluster.getMetadata().getNamespace())
                     .withName(cluster.getMetadata().getName())
@@ -172,10 +181,7 @@ public class ServiceDomainClusterControllerTest extends AbstractControllerTest {
                     .withName(cluster.getMetadata().getName())
                     .delete());
 
-            await().atMost(2, MINUTES).until(() -> client.resources(ServiceDomainCluster.class)
-                    .inNamespace(cluster.getMetadata().getNamespace())
-                    .withName(cluster.getMetadata().getName())
-                    .get() == null);
+            serviceDomainClusterController.reconcile(cluster, null);
 
             assertNull(client.resources(ServiceDomainCluster.class)
                     .inNamespace(cluster.getMetadata().getNamespace())
@@ -193,25 +199,27 @@ public class ServiceDomainClusterControllerTest extends AbstractControllerTest {
 
         Kafka expectedKafka = getExpectedKafKa(cluster);
         client.resources(Kafka.class).inNamespace(sdcNamespace).create(expectedKafka);
-        await().atMost(2, MINUTES).until(() -> client.resources(Kafka.class).inNamespace(sdcNamespace).withName(SERVICE_DOMAIN_CLUSTER_NAME).get() != null);
+//        await().atMost(2, MINUTES).until(() -> client.resources(Kafka.class).inNamespace(sdcNamespace).withName(SERVICE_DOMAIN_CLUSTER_NAME).get() != null);
         Kafka fetchedKafka = client.resources(Kafka.class).inNamespace(sdcNamespace).withName(SERVICE_DOMAIN_CLUSTER_NAME).get();
         assertNotNull(fetchedKafka);
 
         cluster = client.resources(ServiceDomainCluster.class).inNamespace(sdcNamespace).create(cluster);
+        serviceDomainClusterController.reconcile(cluster, null);
 
         expectedKafka = getExpectedKafKa(cluster);
         client.resources(Kafka.class).inNamespace(sdcNamespace).replace(expectedKafka);
-        await().atMost(2, MINUTES).until(() -> client.resources(Kafka.class)
+        assertNotNull(client.resources(Kafka.class)
                 .inNamespace(sdcNamespace)
                 .withName(SERVICE_DOMAIN_CLUSTER_NAME)
-                .get() != null);
+                .get());
 
         final Boolean deleted = client.resources(Kafka.class).inNamespace(sdcNamespace).withName(SERVICE_DOMAIN_CLUSTER_NAME).delete();
         assertTrue(deleted);
+        serviceDomainClusterController.reconcile(cluster, null);
 
-        await().atMost(2, MINUTES).until(() -> client.resources(Kafka.class)
+        assertNotNull(client.resources(Kafka.class)
                 .inNamespace(sdcNamespace)
                 .withName(SERVICE_DOMAIN_CLUSTER_NAME)
-                .get() != null);
+                .get());
     }
 }

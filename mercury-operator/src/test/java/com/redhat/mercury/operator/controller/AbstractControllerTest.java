@@ -33,6 +33,9 @@ public abstract class AbstractControllerTest {
     @Inject
     protected ServiceDomainClusterController serviceDomainClusterController;
 
+    @Inject
+    protected ServiceDomainController serviceDomainController;
+
     public Kafka getExpectedKafKa(ServiceDomainCluster sdc) {
         final Kafka kafka = serviceDomainClusterController.createKafkaObj(sdc);
 
