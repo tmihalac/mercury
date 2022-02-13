@@ -131,6 +131,10 @@ public abstract class AbstractController<K, E extends AbstractResourceStatus, T 
                 Objects.equals(c1.getMessage(), c2.getMessage());
     }
 
+    protected Condition buildReadyCondition(String condition) {
+        return buildCondition(condition, Boolean.TRUE, null, null);
+    }
+
     protected Condition buildCondition(String condition, boolean status, String reason, String message) {
         return new ConditionBuilder()
                 .withType(condition)
@@ -139,9 +143,5 @@ public abstract class AbstractController<K, E extends AbstractResourceStatus, T 
                 .withMessage(message)
                 .withLastTransitionTime(now())
                 .build();
-    }
-
-    protected Condition buildReadyCondition(String condition) {
-        return buildCondition(condition, Boolean.TRUE, null, null);
     }
 }
