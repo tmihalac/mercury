@@ -1,10 +1,5 @@
 package com.redhat.mercury.operator.controller;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +9,6 @@ import com.redhat.mercury.operator.model.ServiceDomainCluster;
 import com.redhat.mercury.operator.model.ServiceDomainClusterSpec;
 import com.redhat.mercury.operator.model.ServiceDomainClusterStatus;
 
-import io.fabric8.kubernetes.api.model.Condition;
 import io.fabric8.kubernetes.api.model.ConditionBuilder;
 import io.fabric8.kubernetes.api.model.OwnerReferenceBuilder;
 import io.fabric8.kubernetes.client.informers.SharedIndexInformer;
@@ -39,6 +33,11 @@ import io.strimzi.api.kafka.model.storage.PersistentClaimStorageBuilder;
 import io.strimzi.api.kafka.model.storage.SingleVolumeStorage;
 import io.strimzi.api.kafka.model.storage.Storage;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.STATUS_FALSE;
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.STATUS_TRUE;
 import static com.redhat.mercury.operator.model.ServiceDomainClusterStatus.CONDITION_KAFKA_BROKER_READY;
@@ -46,8 +45,6 @@ import static com.redhat.mercury.operator.model.ServiceDomainClusterStatus.CONDI
 import static com.redhat.mercury.operator.model.ServiceDomainClusterStatus.MESSAGE_KAFKA_BROKER_NOT_READY;
 import static com.redhat.mercury.operator.model.ServiceDomainClusterStatus.REASON_KAFKA_EXCEPTION;
 import static com.redhat.mercury.operator.model.ServiceDomainClusterStatus.REASON_KAFKA_WAITING;
-import static com.redhat.mercury.operator.utils.ResourceUtils.now;
-import static com.redhat.mercury.operator.utils.ResourceUtils.toStatus;
 
 @ControllerConfiguration
 public class ServiceDomainClusterController extends AbstractController<ServiceDomainClusterSpec, ServiceDomainClusterStatus, ServiceDomainCluster> implements Reconciler<ServiceDomainCluster>, EventSourceInitializer<ServiceDomainCluster> {
@@ -70,12 +67,28 @@ public class ServiceDomainClusterController extends AbstractController<ServiceDo
 
     @Override
     public UpdateControl<ServiceDomainCluster> reconcile(ServiceDomainCluster sdc, Context context) {
+        setStatusCondition(sdc, CONDITION_READY, Boolean.FALSE);
+
         try {
             UpdateControl<ServiceDomainCluster> control = createOrUpdateKafkaBroker(sdc);
             if (control.isUpdateStatus()) {
                 return control;
             }
-            return updateStatusWithKafkaBrokerUrl(sdc);
+
+            control = updateStatusWithKafkaBrokerUrl(sdc);
+            if (control.isUpdateStatus()) {
+                return control;
+            }
+
+            if(areAllConditionsReady(sdc)){
+                control = updateStatusWithCondition(sdc, buildReadyCondition(CONDITION_READY));
+
+                if (control.isUpdateStatus()) {
+                    return control;
+                }
+            }
+
+            return UpdateControl.noUpdate();
         } catch (Exception e) {
             LOGGER.error("{} service domain cluster failed to be created/updated", sdc.getMetadata().getName(), e);
             return updateStatusWithCondition(sdc, new ConditionBuilder()
@@ -116,7 +129,7 @@ public class ServiceDomainClusterController extends AbstractController<ServiceDo
     }
 
     private boolean isKafkaBrokerReady(Kafka kafka) {
-        if (kafka == null || kafka.getStatus() == null) {
+        if (kafka == null || kafka.getStatus() == null || kafka.getStatus().getConditions() == null) {
             return false;
         }
         Optional<io.strimzi.api.kafka.model.status.Condition> condition = kafka.getStatus()
@@ -148,62 +161,6 @@ public class ServiceDomainClusterController extends AbstractController<ServiceDo
         }
         LOGGER.debug("Kafka {} was not updated", sdcName);
         return UpdateControl.noUpdate();
-    }
-
-    private UpdateControl<ServiceDomainCluster> updateStatusWithReadyCondition(ServiceDomainCluster resource, String condition) {
-        return updateStatusWithCondition(resource, new ConditionBuilder()
-                .withType(condition)
-                .withStatus(STATUS_TRUE)
-                .build());
-    }
-
-    private UpdateControl<ServiceDomainCluster> updateStatusWithCondition(ServiceDomainCluster resource, Condition condition) {
-        condition.setLastTransitionTime(now());
-        Condition current = resource.getStatus().getCondition(condition.getType());
-        if (areSameConditions(current, condition)) {
-            LOGGER.debug("ServiceDomainCluster {} Status not updated for condition {}.", resource.getMetadata().getName(), condition.getType());
-            return UpdateControl.noUpdate();
-        }
-        resource.getStatus().setCondition(condition);
-        boolean isReady = resource.getStatus()
-                .getConditions()
-                .stream()
-                .filter(c -> !c.getType().equals(CONDITION_READY))
-                .allMatch(c -> c.getStatus().equals(STATUS_TRUE));
-        if (isReady && !resource.getStatus().isReady()) {
-            LOGGER.debug("ServiceDomainCluster {} transition to READY  {}.", resource.getMetadata().getName(), condition.getType());
-            resource.getStatus().setCondition(buildReadyCondition(CONDITION_READY));
-        }
-        if (resource.getStatus().getCondition(CONDITION_READY) == null || (!isReady && resource.getStatus().isReady())) {
-            LOGGER.debug("ServiceDomainCluster {} transition to NOT READY  {}.", resource.getMetadata().getName(), condition.getType());
-            resource.getStatus().setCondition(buildCondition(CONDITION_READY, Boolean.FALSE, null, null));
-        }
-        LOGGER.debug("ServiceDomainCluster {} Status updated for condition {}.", resource.getMetadata().getName(), condition.getType());
-        return UpdateControl.updateStatus(resource);
-    }
-
-    // The only ignored field when comparing two conditions is the
-    // last transition time
-    public boolean areSameConditions(Condition c1, Condition c2) {
-        return ((c1 == null && c2 == null) || (c1 != null && c2 != null)) &&
-                Objects.equals(c1.getType(), c2.getType()) &&
-                Objects.equals(c1.getStatus(), c2.getStatus()) &&
-                Objects.equals(c1.getReason(), c2.getReason()) &&
-                Objects.equals(c1.getMessage(), c2.getMessage());
-    }
-
-    private Condition buildReadyCondition(String condition) {
-        return buildCondition(condition, Boolean.TRUE, null, null);
-    }
-
-    private Condition buildCondition(String condition, boolean status, String reason, String message) {
-        return new ConditionBuilder()
-                .withType(condition)
-                .withStatus(toStatus(status))
-                .withReason(reason)
-                .withMessage(message)
-                .withLastTransitionTime(now())
-                .build();
     }
 
     protected Kafka createKafkaObj(ServiceDomainCluster sdc) {
