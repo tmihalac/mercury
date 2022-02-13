@@ -53,7 +53,6 @@ import java.util.TreeMap;
 
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.CONDITION_READY;
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.REASON_FAILED;
-import static com.redhat.mercury.operator.model.AbstractResourceStatus.REASON_INVALID_CONFIGURATION;
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.STATUS_FALSE;
 import static com.redhat.mercury.operator.model.ServiceDomainStatus.CONDITION_INTEGRATION_READY;
 import static com.redhat.mercury.operator.model.ServiceDomainStatus.CONDITION_KAFKA_TOPIC_READY;
@@ -483,7 +482,7 @@ public class ServiceDomainController extends AbstractController<ServiceDomainSpe
         final Service sdService = client.services().inNamespace(sdNS).withName(svcName).get();
 
         if (sdService == null || !Objects.equals(sdService.getSpec(), desiredService.getSpec())) {
-            LOGGER.debug("Creating or replacing Service {}", sdName);
+            LOGGER.debug("Creating or replacing Service {}", svcName);
             client.services().inNamespace(sdNS).createOrReplace(desiredService);
             LOGGER.debug("Created or replaced Service {}", svcName);
         }

@@ -621,11 +621,6 @@ public class ServiceDomainControllerTest extends AbstractControllerTest {
             assertThat(deployment).isNotNull();
             assertOwnerReference(sd, deployment.getMetadata().getOwnerReferences());
 
-            //Test Service data
-            final Service service = client.services().inNamespace(sdNamespace).withName(sdName).get();
-            assertThat(service).isNotNull();
-            assertOwnerReference(sd, service.getMetadata().getOwnerReferences());
-
             update = serviceDomainController.reconcile(update.getResource(), null);
             assertThatIsReady(update);
         }
