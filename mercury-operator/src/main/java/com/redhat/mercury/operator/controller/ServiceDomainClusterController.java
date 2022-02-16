@@ -1,5 +1,10 @@
 package com.redhat.mercury.operator.controller;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,11 +37,6 @@ import io.strimzi.api.kafka.model.storage.EphemeralStorage;
 import io.strimzi.api.kafka.model.storage.PersistentClaimStorageBuilder;
 import io.strimzi.api.kafka.model.storage.SingleVolumeStorage;
 import io.strimzi.api.kafka.model.storage.Storage;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.STATUS_FALSE;
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.STATUS_TRUE;
@@ -82,11 +82,7 @@ public class ServiceDomainClusterController extends AbstractController<ServiceDo
             }
 
             if(areAllConditionsReady(sdc)){
-                control = updateStatusWithCondition(sdc, buildReadyCondition(CONDITION_READY));
-
-                if (control.isUpdateStatus()) {
-                    return control;
-                }
+                return updateStatusWithCondition(sdc, buildReadyCondition(CONDITION_READY));
             }
 
             return UpdateControl.noUpdate();

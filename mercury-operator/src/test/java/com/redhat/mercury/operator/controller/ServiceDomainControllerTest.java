@@ -1,5 +1,10 @@
 package com.redhat.mercury.operator.controller;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,13 +36,7 @@ import io.strimzi.api.kafka.model.KafkaTopic;
 import io.strimzi.api.kafka.model.status.ConditionBuilder;
 import io.strimzi.api.kafka.model.status.KafkaTopicStatusBuilder;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
-
 import static com.redhat.mercury.operator.controller.ServiceDomainController.INTEGRATION_SUFFIX;
-import static com.redhat.mercury.operator.controller.ServiceDomainController.OPENAPI_CM_SUFFIX;
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.CONDITION_READY;
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.REASON_FAILED;
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.STATUS_FALSE;
@@ -310,7 +309,7 @@ public class ServiceDomainControllerTest extends AbstractControllerTest {
         assertThatIsNotReady(update);
         assertThat(update.getResource().getStatus().getConditions()).hasSize(3);
         condition = update.getResource().getStatus().getCondition(CONDITION_INTEGRATION_READY);
-        assertThat(condition.getMessage()).isEqualTo(sdTypeAsString + OPENAPI_CM_SUFFIX + " " + MESSAGE_CONFIG_MAP_MISSING);
+        assertThat(condition.getMessage()).isEqualTo(sdTypeAsString + "-openapi" + " " + MESSAGE_CONFIG_MAP_MISSING);
         assertThat(condition.getStatus()).isEqualTo(STATUS_FALSE);
         condition = update.getResource().getStatus().getCondition(CONDITION_KAFKA_TOPIC_READY);
         assertThat(condition).isNull();

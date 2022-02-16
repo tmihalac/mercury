@@ -1,5 +1,13 @@
 package com.redhat.mercury.operator.controller;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,14 +51,6 @@ import io.javaoperatorsdk.operator.processing.event.source.EventSource;
 import io.strimzi.api.kafka.model.KafkaTopic;
 import io.strimzi.api.kafka.model.KafkaTopicBuilder;
 
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.TreeMap;
-
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.CONDITION_READY;
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.REASON_FAILED;
 import static com.redhat.mercury.operator.model.AbstractResourceStatus.STATUS_FALSE;
@@ -88,7 +88,7 @@ public class ServiceDomainController extends AbstractController<ServiceDomainSpe
     private static final int SERVICE_PORT = 9000;
     private static final String COMMENT_LINE_REGEX = "(?m)^#.*";
     private static final String APP_LABEL_BIAN_PREFIX = "bian-";
-    public static final String OPENAPI_CM_SUFFIX = "-openapi";
+    private static final String OPENAPI_CM_SUFFIX = "-openapi";
     private static final String INTEGRATION_SPEC_PROPERTY = "spec";
     private static final String INTEGRATION_STATUS_PROPERTY = "status";
     private static final String INTEGRATION_TYPE_PROPERTY = "type";
@@ -152,7 +152,7 @@ public class ServiceDomainController extends AbstractController<ServiceDomainSpe
                     .build());
         }
 
-        if (sdc.getStatus() != null && sdc.getStatus().getCondition(CONDITION_READY) == null || Boolean.FALSE.toString().equalsIgnoreCase(sdc.getStatus().getCondition(CONDITION_READY).getStatus())) {
+        if (sdc.getStatus().getCondition(CONDITION_READY) == null || Boolean.FALSE.toString().equalsIgnoreCase(sdc.getStatus().getCondition(CONDITION_READY).getStatus())) {
             LOGGER.error("{} service domain cluster not ready", sdcName);
             return updateStatusWithCondition(sd, new ConditionBuilder()
                     .withType(CONDITION_SERVICE_DOMAIN_CLUSTER_READY)
